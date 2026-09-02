@@ -1,0 +1,44 @@
+# GitLab CE behind the existing Traefik instance (shared with searxng)
+# This stack does NOT define its own traefik service — it joins the
+# already-running "proxy" network that your searxng stack created,
+# and lets that same Traefik container route to it.
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    hostname: gitlab.app.mia.verycoolad
+    restart: always
+    shm_size: '256m'          # GitLab recommends bumping this; avoids OOM issues on some workloads
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.app.mia.verycoolad'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        letsencrypt['enable'] = false
+    ports:
+      # Only SSH needs a host port — HTTP is handled entirely by Traefik
+      # via the shared "proxy" network, so we do NOT publish 80/443 here
+      # (those are already owned by the traefik container).
+      - "2222:22"
+    volumes:
+      - gitlab-config:/etc/gitlab
+      - gitlab-logs:/var/log/gitlab
+      - gitlab-data:/var/opt/gitlab
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitlab.rule=Host(`gitlab.app.mia.verycoolad`)"
+      - "traefik.http.routers.gitlab.entrypoints=web"
+      - "traefik.http.services.gitlab.loadbalancer.server.port=80"
+
+volumes:
+  gitlab-config:
+  gitlab-logs:
+  gitlab-data:
+
+networks:
+  proxy:
+    external: true   # created by the searxng stack — reused here, not redefined
