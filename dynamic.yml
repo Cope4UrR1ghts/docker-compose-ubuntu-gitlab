@@ -1,0 +1,18 @@
+http:
+  serversTransports:
+    ignore-cert:
+      insecureSkipVerify: true
+
+  routers:
+    my-router:
+      rule: "Host(`router.mia.verycoolad`)"
+      entryPoints:
+        - "web"
+      service: "my-router-service"
+
+  services:
+    my-router-service:
+      loadBalancer:
+        serversTransport: "ignore-cert"
+        servers:
+          - url: "https://192.168.1.1:444"
